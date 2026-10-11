@@ -1,5 +1,6 @@
 """Remove build-prefix loader paths before packaging native executables/libraries."""
 from pathlib import Path
+import os
 import platform
 import subprocess
 
@@ -17,11 +18,11 @@ for path in files:
                 target = root / 'lib' / Path(dependency).name
                 if not target.exists():
                     raise SystemExit(f'Missing bundled dependency: {dependency}')
-                import os
                 relative = os.path.relpath(target, path.parent)
                 subprocess.run(['install_name_tool', '-change', dependency, '@loader_path/' + relative, str(path)], check=True)
         subprocess.run(['codesign', '--force', '--sign', '-', str(path)], check=True)
     elif platform.system() == 'Linux' and magic == b'\x7fELF':
         # Keep PostgreSQL's bundled libpq available after installation to another prefix.
-        rpath = '$ORIGIN/../lib' if path.parent == root / 'bin' else '$ORIGIN'
+        relative = os.path.relpath(root / 'lib', path.parent)
+        rpath = '$ORIGIN' if relative == '.' else '$ORIGIN/' + relative
         subprocess.run(['patchelf', '--set-rpath', rpath, str(path)], check=True)
