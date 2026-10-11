@@ -21,4 +21,5 @@ def test_release_runtime(tmp_path):
         assert '180006' in result
         assert '0.8.6' in result
         assert server.get_postmaster_info().socket_dir is not None
-        assert server.get_postmaster_info().hostname == ""
+        assert server.get_postmaster_info().hostname is None
+    assert not server.get_postmaster_info().is_running()
