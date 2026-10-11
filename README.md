@@ -43,7 +43,7 @@ worker. See [upstream usage](UPSTREAM-README.md).
 
 `make` builds native binaries once; `python -m build --wheel` packages them.
 Native build prerequisites include a C compiler, make, Python 3, curl, bison,
-flex, and zlib development headers. Source installs require `make` first.
+flex, zlib development headers, and patchelf on Linux. Source installs require `make` first.
 
 1. Update `POSTGRES_VERSION` / `POSTGRES_SHA256` and `PGVECTOR_TAG` /
    `PGVECTOR_SHA256` in `pgbuild/Makefile`. Both can be overridden with make
@@ -66,4 +66,4 @@ The Python wrapper retains upstream Apache-2.0 [LICENSE](LICENSE), attribution,
 and history. [NOTICE](NOTICE) identifies fork changes. PostgreSQL and pgvector
 use the PostgreSQL license; their source license texts are included in wheels.
 The fork keeps the caller API and changes build versions, checksum validation,
-portable pgvector flags, license packaging, and release automation.
+portable pgvector flags, relocatable native libraries, license packaging, and release automation.

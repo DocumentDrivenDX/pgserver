@@ -2,7 +2,8 @@
 .PHONY: build wheel install-wheel install-dev clean test
 
 build:
-	$(MAKE) -d -C pgbuild all
+	$(MAKE) -C pgbuild all
+	python3 scripts/relocate-native.py
 
 wheel: build
 	python setup.py bdist_wheel

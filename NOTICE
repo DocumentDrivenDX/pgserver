@@ -2,6 +2,6 @@ DocumentDrivenDX pgserver fork
 Based on https://github.com/orm011/pgserver (Apache-2.0).
 Original author: Oscar Moll. See LICENSE and upstream Git history.
 Changes: PostgreSQL 18.6, pgvector 0.8.6, verified source downloads, portable
-pgvector compilation, bundled dependency licenses, and release wheel automation.
+pgvector compilation, relocatable native libraries, bundled dependency licenses, and release wheel automation.
 PostgreSQL and pgvector retain their PostgreSQL license texts under
 pgserver/licenses in each built wheel.

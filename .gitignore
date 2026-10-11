@@ -135,3 +135,6 @@ dmypy.json
 build/
 pgbuild/
 src/pgserver/pginstall
+
+# Generated from verified dependency source archives
+src/pgserver/licenses/

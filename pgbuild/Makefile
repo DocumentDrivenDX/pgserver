@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 INSTALL_PREFIX := $(shell pwd)/../src/pgserver/pginstall/
 BUILD := $(shell pwd)/pgbuild/
+JOBS ?= 4
 
 .PHONY: all
 all: pgvector postgres
@@ -32,7 +33,7 @@ $(POSTGRES_BLD)/config.status: $(POSTGRES_SRC)/configure
 # https://stackoverflow.com/questions/68379786/
 # for explanation of unsetting make env variables prior to calling postgres' own make
 $(POSTGRES_BLD)/src/bin/initdb/initdb: $(POSTGRES_BLD)/config.status
-	unset MAKELEVEL && unset MAKEFLAGS && unset MFLAGS && $(MAKE) -C $(POSTGRES_BLD) -j
+	unset MAKELEVEL && unset MAKEFLAGS && unset MFLAGS && $(MAKE) -C $(POSTGRES_BLD) -j$(JOBS)
 
 ## install to INSTALL_PREFIX
 $(INSTALL_PREFIX)/bin/postgres: $(POSTGRES_BLD)/src/bin/initdb/initdb
@@ -63,7 +64,7 @@ $(PGVECTOR_DIR)/Makefile: $(PGVECTOR_DIR).tar.gz
 $(INSTALL_PREFIX)/lib/vector.so: $(PGVECTOR_DIR)/Makefile $(INSTALL_PREFIX)/bin/postgres
 	unset MAKELEVEL && unset MAKEFLAGS && unset MFLAGS \
 		&& export PG_CONFIG=$(INSTALL_PREFIX)/bin/pg_config \
-		&& $(MAKE) -C $(PGVECTOR_DIR) -j OPTFLAGS="" \
+		&& $(MAKE) -C $(PGVECTOR_DIR) -j$(JOBS) OPTFLAGS="" \
 		&& $(MAKE) -C $(PGVECTOR_DIR) install
 
 .PHONY: pgvector
