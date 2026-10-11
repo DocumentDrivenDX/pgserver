@@ -29,6 +29,7 @@ jobs:
             os: macos-14
             arch: arm64
     runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

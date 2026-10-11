@@ -19,7 +19,7 @@ import os
 
 def _check_sqlalchemy_works(srv : pgserver.PostgresServer):
     database_name = 'testdb'
-    uri = srv.get_uri(database_name)
+    uri = srv.get_uri(database_name).replace("postgresql://", "postgresql+psycopg2://", 1)
 
     if not database_exists(uri):
         create_database(uri)

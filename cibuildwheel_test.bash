@@ -1,13 +1,5 @@
-#! /bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 PROJECT=$1
-
-echo "Running on OSTYPE=$OSTYPE with UID=$UID"
-
-case "$OSTYPE" in
-    # linux *)
-    #     echo "Tests disabled on the manylinux docker container for now"
-    #     ;;
-    *)
-        pytest -s -v --log-cli-level=INFO $PROJECT/tests
-        ;;
-esac
+# Abort promptly on failure; bound tests even when a child never answers a queue.
+python -m pytest -x -v --timeout=90 --timeout-method=thread --log-cli-level=INFO "$PROJECT/tests"
