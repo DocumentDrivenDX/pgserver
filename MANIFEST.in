@@ -1,1 +1,3 @@
 graft src/pgserver/pginstall
+graft src/pgserver/licenses
+include NOTICE

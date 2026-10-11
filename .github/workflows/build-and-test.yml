@@ -1,117 +1,82 @@
-name: Build and Test
+name: Build verified release wheels
 on:
   push:
-    branches:
-      - testing
-      - main
-  release:
-    types:
-      - created
+    branches: [main]
+    tags: ['pg*-pgv*']
+  pull_request:
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  wheels:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-12
-            arch: x86_64
-            deployment-target: '10.9'
-          - os: macos-latest
+          - os: macos-14
             arch: arm64
-            deployment-target: '11.0'
-          - os: ubuntu-latest
+          - os: macos-15-intel
             arch: x86_64
-            deployment-target: ''
-          - os: windows-2022
-            arch: AMD64
-            deployment-target: ''
+          - os: ubuntu-24.04
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        if: matrix.os != 'ubuntu-latest'
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-      - uses: actions/setup-python@v4
-        if: matrix.os == 'ubuntu-latest'
-          # for testing due to docker env issues
-        with:
-          python-version: '3.9'
-      - name: Install cibuildwheel
+          python-version: '3.11'
+      - name: Install native build prerequisites
+        if: runner.os == 'macOS'
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install --upgrade cibuildwheel
-      - name: Restore postgres build from cache
-        if: ${{ matrix.os != 'ubuntu-latest' }}
-        id: restore-postgres
-        uses: actions/cache/restore@v3
-        env:
-          cache-name: cache-postgres
-        with:
-          path: |
-            pgbuild
-            src/pgserver/pginstall
-          key: ${{ runner.os }}-${{ runner.arch }}-build-${{ env.cache-name }}-${{
-            hashFiles('Makefile', 'pgbuild/Makefile', '.github/workflows/build-and-test.yml') }}
-      - name: Build postgres and pgvector
-        if: ${{ matrix.os != 'ubuntu-latest' && ! steps.restore-postgres.outputs.cache-hit }}
-        env:
-          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment-target }}
-        # this step is implied by Build wheels, but we do it here for caching before python tests run
-        # on ubuntu, cibuildwheel will run this step within a docker container, so it cannot use the cache this way
-        run: make
-      - name: Save postgres build
-        if: ${{ matrix.os != 'ubuntu-latest' && ! steps.restore-postgres.outputs.cache-hit }}
-        id: cache-postgres
-        uses: actions/cache/save@v3
-        env:
-          cache-name: cache-postgres
-        with:
-          path: |
-           pgbuild
-           src/pgserver/pginstall
-          key: ${{ runner.os }}-${{ runner.arch }}-build-${{ env.cache-name }}-${{
-            hashFiles('Makefile', 'pgbuild/Makefile', '.github/workflows/build-and-test.yml') }}
-      - name: Build wheels
+          brew install bison flex
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
+      - name: Build and test wheels
+        uses: pypa/cibuildwheel@v2.23.3
         env:
           CIBW_ARCHS: ${{ matrix.arch }}
-          CIBW_SKIP: pp* cp38-* *-musllinux*
-          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment-target }}
-        run: python -m cibuildwheel --output-dir wheelhouse
-      - name: Save postgres build
-        if: ${{ matrix.os == 'ubuntu-latest' && ! steps.restore-postgres.outputs.cache-hit }}
-        id: cache-postgres2
-        uses: actions/cache/save@v3
-        env:
-          cache-name: cache-postgres
+          CIBW_BUILD: 'cp39-* cp310-* cp311-* cp312-* cp313-*'
+          CIBW_SKIP: '*-musllinux* *-win*'
+          CIBW_BEFORE_ALL_LINUX: 'yum install -y bison flex zlib-devel && make'
+          CIBW_ENVIRONMENT_MACOS: 'MACOSX_DEPLOYMENT_TARGET=14.0'
+          MACOSX_DEPLOYMENT_TARGET: '14.0'
+      - uses: actions/upload-artifact@v4
         with:
-          path: |
-           pgbuild
-           src/pgserver/pginstall
-          key: ${{ runner.os }}-${{ runner.arch }}-build-${{ env.cache-name }}-${{
-            hashFiles('Makefile', 'pgbuild/Makefile', '.github/workflows/build-and-test.yml') }}
-      - uses: actions/upload-artifact@v3
-        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.arch }}
           path: wheelhouse/*.whl
-          name: python-package-distributions
-  publish-to-pypi:
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    name: Publish Python dist to PyPI
-    needs:
-      - build_wheels
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/pgserver  # Replace <package-name> with your PyPI project name
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: wheels
+    runs-on: ubuntu-24.04
     permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
+      contents: write
+      id-token: write
+      attestations: write
     steps:
-        - name: Download all the dists
-          uses: actions/download-artifact@v3
-          with:
-            name: python-package-distributions
-            path: dist/
-        - name: Publish distribution 📦 to PyPI
-          uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/checkout@v4
+      - name: Validate tag against build configuration
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          text = Path('pgbuild/Makefile').read_text()
+          pg = re.search(r'^POSTGRES_VERSION \?= (.+)$', text, re.M)[1]
+          vector = re.search(r'^PGVECTOR_TAG \?= v(.+)$', text, re.M)[1]
+          assert os.environ['GITHUB_REF_NAME'] == f'pg{pg}-pgv{vector}'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.whl
+      - name: Publish release wheels and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum *.whl > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" *.whl SHA256SUMS --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes

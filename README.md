@@ -1,72 +1,69 @@
-![Python Version](https://img.shields.io/badge/python-3.9%2C%203.10%2C%203.11%2C%203.12-blue)
-![Postgres Version](https://img.shields.io/badge/PostgreSQL-16.2-blue)
+# PostgreSQL 18 wheels for pgserver
 
-![Linux Support](https://img.shields.io/badge/Linux%20Support-manylinux-green)
-![macOS Apple Silicon Support >=11](https://img.shields.io/badge/macOS%20Apple%20Silicon%20Support-%E2%89%A511(BigSur)-green)
-![macOS Intel Support => 10.0](https://img.shields.io/badge/macOS%20Intel%20Support-%E2%89%A510.9-green)
-![Windows Support >= 2022](https://img.shields.io/badge/Windows%20AMD64%20Support-%E2%89%A52022-green)
+DocumentDrivenDX fork of [orm011/pgserver](https://github.com/orm011/pgserver),
+for applications that need an embedded PostgreSQL 18 server, including tests
+that match the PostgreSQL major version used by Lakebase. This does not claim
+full Lakebase feature parity.
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-darkblue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![PyPI Package](https://img.shields.io/pypi/v/pgserver?color=darkorange)](https://pypi.org/project/pgserver)
-![PyPI - Downloads](https://img.shields.io/pypi/dm/pgserver)
+The distribution is `pgserver-pg18` version `18.6.0`; the Python import remains
+`pgserver`. It bundles PostgreSQL **18.6** and pgvector **0.8.6**. Do not install
+it alongside the upstream `pgserver` distribution, which owns the same imports.
+Ordinary wheel installation does not compile PostgreSQL.
 
+## Install
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/orm011/pgserver/main/pgserver_square_small.png"/>
-</p>
+Download the wheel matching your Python and platform from
+[Releases](https://github.com/DocumentDrivenDX/pgserver/releases), then run:
 
-# pgserver: pip-installable, embedded postgres server + pgvector extension for your python app
+```sh
+uv pip install /path/to/pgserver_pg18-18.6.0-<python-and-platform-tags>.whl
+# A full GitHub Release asset URL works in place of the local path.
+```
 
-`pgserver` lets you build Postgres-backed python apps with the same convenience afforded by an embedded database (ie, alternatives such as sqlite). 
-If you build your app with pgserver, your app remains wholly pip-installable, saving your users from needing to understand how to setup a postgres server (they simply pip install your app, and postgres is brought in through dependencies), and letting you get started developing quickly: just `pip install pgserver` and `pgserver.get_server(...)`, as shown in this notebook: <a target="_blank" href="https://colab.research.google.com/github/orm011/pgserver/blob/master/pgserver-example.ipynb"> <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/> </a> 
+Release tags use `pg18.6-pgv0.8.6`. CI targets macOS arm64 and x86_64
+(macOS 14 minimum), and Linux x86_64 (manylinux). Wheel availability and
+verification are determined by the successful workflow artifacts; a target
+is not a support claim before its build and tests pass. No PyPI publication.
 
-To achieve this, you need two things which `pgserver` provides
-  * python binary wheels for multiple-plaforms with postgres binaries
-  * convenience python methods that handle db initialization and server process management, that deals with things that would normally prevent you from running your python app seamlessly on environments like docker containers, a machine you have no root access in, machines with other running postgres servers, google colab, etc.  One main goal of the project is robustness around this.
-
-Additionally, this package includes the [pgvector](https://github.com/pgvector/pgvector) postgres extension, useful for storing associated vector data and for vector similarity queries.
-
-## Basic summary:
-* _Pip installable binaries_: built and tested on Manylinux, MacOS and Windows.
-* _No sudo or admin rights needed_: Does not require `root` privileges or `sudo`.
-* but... _can handle root_: in some environments your python app runs as root, eg docker, google colab, `pgserver` handles this case.
-* _Simpler initialization_: `pgserver.get_server(MY_DATA_DIR)` method to initialize data and server if needed, so you don't need to understand `initdb`, `pg_ctl`, port conflicts.
-* _Convenient cleanup_: server process cleanup is done for you: when the process using pgserver ends, the server is shutdown, including when multiple independent processes call
-`pgserver.get_server(MY_DATA_DIR)` on the same dir (wait for last one). You can blow away your PGDATA dir and start again.
-* For lower-level control, wrappers to all binaries, such as `initdb`, `pg_ctl`, `psql`, `pg_config`. Includes header files in case you wish to build some other extension and use it against these binaries.
-
-```py
-# Example 1: postgres backed application
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import pgserver
 
-db = pgserver.get_server(MYPGDATA)
-# server ready for connection.
-
-print(db.psql('create extension vector'))
-db_uri = db.get_uri()
-# use uri with sqlalchemy / psycopg, etc, see colab.
-
-# if no other process is using this server, it will be shutdown at exit,
-# if other process use same pgadata, server process will be shutdown when all stop.
+with TemporaryDirectory(prefix="pg18-") as root:
+    with pgserver.get_server(Path(root) / "data") as server:
+        print(server.get_uri())
 ```
 
-```py
-# Example 2: Testing
-import tempfile
-import pytest
-@pytest.fixture
-def tmp_postgres():
-    tmp_pg_data = tempfile.mkdtemp()
-    pg = pgserver.get_server(tmp_pg_data, cleanup_mode='stop')
-    yield pg
-    pg.cleanup()
-```
+On Unix the upstream API disables TCP and selects a Unix socket directory.
+Use a separate data directory per test worker and keep one server alive per
+worker. See [upstream usage](UPSTREAM-README.md).
 
-Postgres binaries in the package can be found in the directory pointed
-to by the `pgserver.POSTGRES_BIN_PATH` to be used directly.
+## Build and update
 
-This project was originally based on [](https://github.com/michelp/postgresql-wheel), which provides a linux wheel.
-But adds the following differences:
-1. binary wheels for multiple platforms (ubuntu x86, MacOS apple silicon, MacOS x86, Windows)
-2. postgres python management: cross-platfurm startup and cleanup including many edge cases, runs on colab etc.
-3. includes `pgvector` extension but currently excludes `postGIS`
+`make` builds native binaries once; `python -m build --wheel` packages them.
+Native build prerequisites include a C compiler, make, Python 3, curl, bison,
+flex, and zlib development headers. Source installs require `make` first.
+
+1. Update `POSTGRES_VERSION` / `POSTGRES_SHA256` and `PGVECTOR_TAG` /
+   `PGVECTOR_SHA256` in `pgbuild/Makefile`. Both can be overridden with make
+   variables, but matching trusted checksums are required.
+2. Obtain the PostgreSQL checksum from its official release source directory
+   and independently review the pgvector release and its source checksum.
+3. Bump the distribution version in `pyproject.toml`; rebuild from a clean
+   checkout to avoid reusing binaries from a different source version.
+4. Run the build workflow, inspect all three platform tests, then push the
+   matching `pg<version>-pgv<version>` tag. The workflow attaches wheels,
+   checksums and GitHub build-provenance attestations to the release.
+
+PostgreSQL minor releases normally arrive roughly quarterly; consult its
+[release schedule](https://www.postgresql.org/developer/roadmap/) and
+[18.6 notes](https://www.postgresql.org/docs/release/18.6/).
+
+## Licenses and changes
+
+The Python wrapper retains upstream Apache-2.0 [LICENSE](LICENSE), attribution,
+and history. [NOTICE](NOTICE) identifies fork changes. PostgreSQL and pgvector
+use the PostgreSQL license; their source license texts are included in wheels.
+The fork keeps the caller API and changes build versions, checksum validation,
+portable pgvector flags, license packaging, and release automation.
