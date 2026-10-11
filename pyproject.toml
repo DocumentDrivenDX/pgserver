@@ -3,7 +3,7 @@ name = "pgserver-pg18" # Required
 version = "18.6.0"  # Required
 description = "Self-contained postgres server for your python applications" # Required
 readme = "README.md" # Optional
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 urls={repository="https://github.com/DocumentDrivenDX/pgserver"}
 authors=[{ name="Oscar Moll", email="orm@csail.mit.edu" }]
@@ -20,7 +20,7 @@ dev = [
 ]
 test = [
     "pytest",
-    "psycopg2-binary",
+    "psycopg2-binary==2.9.10",
     "sqlalchemy>=2",
     "sqlalchemy-utils"
 ]

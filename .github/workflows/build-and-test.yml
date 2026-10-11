@@ -46,7 +46,7 @@ jobs:
         uses: pypa/cibuildwheel@v2.23.3
         env:
           CIBW_ARCHS: ${{ matrix.platform.arch }}
-          CIBW_BUILD: 'cp39-* cp310-* cp311-* cp312-* cp313-*'
+          CIBW_BUILD: 'cp310-* cp311-* cp312-* cp313-*'
           CIBW_SKIP: '*-musllinux* *-win*'
           CIBW_BEFORE_ALL_LINUX: 'yum install -y bison flex zlib-devel && command -v patchelf && make'
           CIBW_ENVIRONMENT_MACOS: 'MACOSX_DEPLOYMENT_TARGET=14.0'

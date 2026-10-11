@@ -18,7 +18,7 @@ The pinned latest minor releases, checked on 2026-10-11 against the official
 
 Each version builds on native **Linux x86_64**, **Linux aarch64**, and
 **macOS arm64** runners. Linux wheels target manylinux; macOS has a macOS 14
-minimum. The matrix builds and tests CPython 3.9–3.13 wheels. Successful
+minimum. The matrix builds and tests CPython 3.10–3.13 wheels. Successful
 workflow artifacts and release assets establish availability for each target.
 Intel macOS and Windows are outside the current build matrix.
 
