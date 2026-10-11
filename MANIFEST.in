@@ -1,3 +1,7 @@
 graft src/pgserver/pginstall
 graft src/pgserver/licenses
 include NOTICE
+include src/pgserver/_build_info.json
+include build-versions.json
+recursive-include scripts *.py
+include Makefile pgbuild/Makefile

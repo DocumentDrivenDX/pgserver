@@ -1,36 +1,52 @@
-# PostgreSQL 18 wheels for pgserver
+# PostgreSQL wheels for pgserver
 
 DocumentDrivenDX fork of [orm011/pgserver](https://github.com/orm011/pgserver),
-for applications that need an embedded PostgreSQL 18 server, including tests
-that match the PostgreSQL major version used by Lakebase. This does not claim
+for applications and tests that need a self-contained PostgreSQL server.
+PostgreSQL 18 can match the major version used by Lakebase; this does not claim
 full Lakebase feature parity.
 
-The distribution is `pgserver-pg18` version `18.6.0`; the Python import remains
-`pgserver`. It bundles PostgreSQL **18.6** and pgvector **0.8.6**. Do not install
-it alongside the upstream `pgserver` distribution, which owns the same imports.
+## Versions and platforms
+
+The pinned latest minor releases, checked on 2026-10-11 against the official
+[PostgreSQL version table](https://www.postgresql.org/support/versioning/), are:
+
+| PostgreSQL | Python distribution | Distribution version | pgvector |
+| --- | --- | --- | --- |
+| 16.15 | `pgserver-pg16` | `16.15.0` | 0.8.6 |
+| 17.11 | `pgserver-pg17` | `17.11.0` | 0.8.6 |
+| 18.6 | `pgserver-pg18` | `18.6.0` | 0.8.6 |
+
+Each version builds on native **Linux x86_64**, **Linux aarch64**, and
+**macOS arm64** runners. Linux wheels target manylinux; macOS has a macOS 14
+minimum. The matrix builds and tests CPython 3.9–3.13 wheels. Successful
+workflow artifacts and release assets establish availability for each target.
+Intel macOS and Windows are outside the current build matrix.
+
+All three distributions retain the Python import `pgserver`. Install only
+one in an environment: they own the same imports, as does upstream `pgserver`.
 Ordinary wheel installation does not compile PostgreSQL.
 
 ## Install
 
-Download the wheel matching your Python and platform from
-[Releases](https://github.com/DocumentDrivenDX/pgserver/releases), then run:
+Select a wheel matching your PostgreSQL major, Python version, and platform
+from [Releases](https://github.com/DocumentDrivenDX/pgserver/releases):
 
 ```sh
-uv pip install /path/to/pgserver_pg18-18.6.0-<python-and-platform-tags>.whl
+uv pip install /path/to/pgserver_pg17-17.11.0-<python-and-platform-tags>.whl
 # A full GitHub Release asset URL works in place of the local path.
 ```
 
-Release tags use `pg18.6-pgv0.8.6`. CI targets macOS arm64 and x86_64
-(macOS 14 minimum), and Linux x86_64 (manylinux). Wheel availability and
-verification are determined by the successful workflow artifacts; a target
-is not a support claim before its build and tests pass. No PyPI publication.
+No PyPI publication. Release tags are recorded in `build-versions.json`.
+They normally use `pg<version>-pgv<version>`; a revision suffix distinguishes
+changes to packaging for the same native versions. The expanded PG18 platform
+set uses `pg18.6-pgv0.8.6-r1` to preserve the initial tag's history.
 
 ```python
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import pgserver
 
-with TemporaryDirectory(prefix="pg18-") as root:
+with TemporaryDirectory(prefix="pg-test-") as root:
     with pgserver.get_server(Path(root) / "data") as server:
         print(server.get_uri())
 ```
@@ -41,24 +57,37 @@ worker. See [upstream usage](UPSTREAM-README.md).
 
 ## Build and update
 
-`make` builds native binaries once; `python -m build --wheel` packages them.
-Native build prerequisites include a C compiler, make, Python 3, curl, bison,
-flex, zlib development headers, and patchelf on Linux. Source installs require `make` first.
+The source of truth is `build-versions.json`: versions, trusted source SHA256
+checksums, distribution identities, and release tags. To build a selected major
+in a clean checkout:
 
-1. Update `POSTGRES_VERSION` / `POSTGRES_SHA256` and `PGVECTOR_TAG` /
-   `PGVECTOR_SHA256` in `pgbuild/Makefile`. Both can be overridden with make
-   variables, but matching trusted checksums are required.
-2. Obtain the PostgreSQL checksum from its official release source directory
-   and independently review the pgvector release and its source checksum.
-3. Bump the distribution version in `pyproject.toml`; rebuild from a clean
-   checkout to avoid reusing binaries from a different source version.
-4. Run the build workflow, inspect all three platform tests, then push the
-   matching `pg<version>-pgv<version>` tag. The workflow attaches wheels,
-   checksums and GitHub build-provenance attestations to the release.
+```sh
+python3 scripts/select-postgres.py 17
+make
+python -m build --wheel
+```
+
+`make` builds the native binaries once and repairs loader paths so installation
+can relocate them. Native prerequisites include a C compiler, make, Python 3,
+curl, bison, flex, zlib development headers, and patchelf on Linux. Source
+installs require `make` first. A selected major requires a clean native install
+to prevent reuse of binaries from a different PostgreSQL version.
+
+1. Update the corresponding version, checksum, distribution version and release
+   tag in `build-versions.json`. Keep the Makefile and pyproject default PG18
+   values aligned with that entry.
+2. Obtain PostgreSQL source checksums from its official release directory and
+   independently review pgvector source checksums when updating pgvector.
+3. Run the nine-job build matrix. Installed-wheel tests check binary versions,
+   bundled licenses, pgvector loading, Unix sockets, disabled TCP, and cleanup,
+   in addition to the upstream test suite.
+4. Dispatch the workflow from `main` with `publish=true`. Only after all nine
+   platform/version jobs pass will it create three separate GitHub Releases,
+   with wheels, checksums and GitHub build-provenance attestations. Each release
+   tag targets the exact workflow commit. Choose new tags for subsequent updates.
 
 PostgreSQL minor releases normally arrive roughly quarterly; consult its
-[release schedule](https://www.postgresql.org/developer/roadmap/) and
-[18.6 notes](https://www.postgresql.org/docs/release/18.6/).
+[release schedule](https://www.postgresql.org/developer/roadmap/).
 
 ## Licenses and changes
 
@@ -66,4 +95,5 @@ The Python wrapper retains upstream Apache-2.0 [LICENSE](LICENSE), attribution,
 and history. [NOTICE](NOTICE) identifies fork changes. PostgreSQL and pgvector
 use the PostgreSQL license; their source license texts are included in wheels.
 The fork keeps the caller API and changes build versions, checksum validation,
-portable pgvector flags, relocatable native libraries, license packaging, and release automation.
+portable pgvector flags, relocatable native libraries, license packaging,
+and release automation.
