@@ -30,7 +30,20 @@ def get_json(path):
 
 
 def get_release(repo, tag):
-    return get_json(f'repos/{repo}/releases/tags/{tag}')
+    release = get_json(f'repos/{repo}/releases/tags/{tag}')
+    if release is not None:
+        return release
+    # The tag endpoint returns published releases only. Drafts are available
+    # to the repository token through the paginated releases collection.
+    page = 1
+    while True:
+        releases = get_json(f'repos/{repo}/releases?per_page=100&page={page}')
+        for entry in releases:
+            if entry['tag_name'] == tag:
+                return entry
+        if len(releases) < 100:
+            return None
+        page += 1
 
 
 def get_ref(repo, tag):

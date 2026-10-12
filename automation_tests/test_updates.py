@@ -161,3 +161,16 @@ class PublicationRetries(unittest.TestCase):
         tag = json.loads((ROOT / 'build-versions.json').read_text())['postgres']['18']['release_tag']
         self.assertIn('ref=refs/tags/' + tag, commands[0])
         self.assertIn('--draft=false', commands[-1])
+
+
+class DraftDiscovery(unittest.TestCase):
+    def test_unpublished_draft_is_found_through_release_collection(self):
+        import release_status
+        draft = {'tag_name': 'pg18.99-pgv0.8.6', 'draft': True}
+        with patch.object(release_status, 'get_json', side_effect=[None, [draft]]):
+            self.assertEqual(release_status.get_release('owner/repo', draft['tag_name']), draft)
+
+    def test_missing_release_remains_missing(self):
+        import release_status
+        with patch.object(release_status, 'get_json', side_effect=[None, []]):
+            self.assertIsNone(release_status.get_release('owner/repo', 'missing'))
