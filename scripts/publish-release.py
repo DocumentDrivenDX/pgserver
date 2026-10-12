@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
-from release_status import complete, expected_wheels, get_release
+from release_status import complete, expected_wheels, get_release, get_ref
 
 
 def gh(*args):
@@ -27,8 +27,13 @@ if release is None:
     gh('release', 'create', tag, '--repo', repo, '--target', os.environ['SOURCE_SHA'], '--draft', '--generate-notes')
 else:
     # An unpublished draft can be retried after a failed upload or CI repair.
-    gh('api', f'repos/{repo}/git/refs/tags/{tag}', '--method', 'PATCH',
-       '-f', 'sha=' + os.environ['SOURCE_SHA'], '-F', 'force=true')
+    if get_ref(repo, tag) is None:
+        # GitHub can defer creating a draft's tag until publication.
+        gh('api', f'repos/{repo}/git/refs', '--method', 'POST',
+           '-f', 'ref=refs/tags/' + tag, '-f', 'sha=' + os.environ['SOURCE_SHA'])
+    else:
+        gh('api', f'repos/{repo}/git/refs/tags/{tag}', '--method', 'PATCH',
+           '-f', 'sha=' + os.environ['SOURCE_SHA'], '-F', 'force=true')
 gh('release', 'upload', tag, *map(str, assets), 'dist/SHA256SUMS', '--repo', repo, '--clobber')
 release = get_release(repo, tag)
 if not complete(dict(release, draft=False), entry):

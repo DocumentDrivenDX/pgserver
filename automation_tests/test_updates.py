@@ -112,7 +112,7 @@ class PinPersistence(unittest.TestCase):
             self.assertIn(f'| 18.{minor} |', (root / 'README.md').read_text())
 
 class PublicationRetries(unittest.TestCase):
-    def run_publisher(self, releases):
+    def run_publisher(self, releases, ref_exists=True):
         import contextlib
         import os
         import runpy
@@ -126,7 +126,7 @@ class PublicationRetries(unittest.TestCase):
             (root / 'dist').mkdir()
             for name in expected_wheels(entry) | {'SHA256SUMS'}:
                 (root / 'dist' / name).write_text('test artifact')
-            with contextlib.chdir(root), patch.dict(os.environ, PG_MAJOR='18', GITHUB_REPOSITORY='DocumentDrivenDX/pgserver', SOURCE_SHA='c' * 40), patch('release_status.get_release', side_effect=releases), patch('subprocess.run') as command:
+            with contextlib.chdir(root), patch.dict(os.environ, PG_MAJOR='18', GITHUB_REPOSITORY='DocumentDrivenDX/pgserver', SOURCE_SHA='c' * 40), patch('release_status.get_release', side_effect=releases), patch('release_status.get_ref', return_value={'object': {}} if ref_exists else None), patch('subprocess.run') as command:
                 try:
                     runpy.run_path(str(ROOT / 'scripts/publish-release.py'))
                 except SystemExit as result:
@@ -154,3 +154,9 @@ class PublicationRetries(unittest.TestCase):
         self.assertEqual(commands[0][:3], ['gh', 'release', 'create'])
         self.assertIn('--draft', commands[0])
         self.assertEqual(commands[-1][:3], ['gh', 'release', 'edit'])
+
+    def test_draft_without_a_tag_can_be_retried(self):
+        commands = self.run_publisher([self.fixture(draft=True), self.fixture(draft=True)], ref_exists=False)
+        self.assertIn('POST', commands[0])
+        self.assertIn('ref=refs/tags/pg18.6-pgv0.8.6-r1', commands[0])
+        self.assertIn('--draft=false', commands[-1])

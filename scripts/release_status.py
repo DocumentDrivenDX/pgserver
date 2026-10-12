@@ -17,8 +17,8 @@ def expected_wheels(entry):
     }
 
 
-def get_release(repo, tag):
-    request = urllib.request.Request(f'https://api.github.com/repos/{repo}/releases/tags/{tag}',
+def get_json(path):
+    request = urllib.request.Request(f'https://api.github.com/{path}',
         headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
@@ -27,6 +27,14 @@ def get_release(repo, tag):
         if error.code == 404:
             return None
         raise
+
+
+def get_release(repo, tag):
+    return get_json(f'repos/{repo}/releases/tags/{tag}')
+
+
+def get_ref(repo, tag):
+    return get_json(f'repos/{repo}/git/ref/tags/{tag}')
 
 
 def complete(release, entry):
