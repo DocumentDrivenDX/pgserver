@@ -1,3 +1,4 @@
+from urllib.parse import quote
 from pathlib import Path
 import typing
 from typing import Optional, List, Dict
@@ -93,7 +94,7 @@ class PostmasterInfo:
             database = user
 
         if self.socket_dir is not None:
-            return f"postgresql://{user}:@/{database}?host={self.socket_dir}"
+            return f"postgresql://{user}:@/{database}?host={quote(str(self.socket_dir), safe='/')}"
         elif self.port is not None:
             assert self.hostname is not None
             return f"postgresql://{user}:@{self.hostname}:{self.port}/{database}"

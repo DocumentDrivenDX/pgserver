@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional, Dict, Union
 import shutil
+import shlex
 import atexit
 import subprocess
 import os
@@ -155,7 +156,7 @@ class PostgresServer:
 
                 pg_ctl_args = ['-w',  # wait for server to start
                         '-o', '-h ""',  # no listening on any IP addresses (forwarded to postgres exec) see man postgres for -hj
-                        '-o',  f'-k {socket_dir}', # socket option (forwarded to postgres exec) see man postgres for -k
+                        '-o',  '-k ' + shlex.quote(str(socket_dir)), # socket option (forwarded to postgres exec) see man postgres for -k
                         '-l', str(self.log), # log location: set to pgdata dir also
                         'start' # action
                 ]
@@ -244,8 +245,8 @@ class PostgresServer:
         """ Runs a psql command on this server. The command is passed to psql via stdin.
         """
         executable = POSTGRES_BIN_PATH / 'psql'
-        stdout = subprocess.check_output(f'{executable} {self.get_uri()}',
-                                         input=command.encode(), shell=True)
+        stdout = subprocess.check_output([str(executable), self.get_uri()],
+                                         input=command.encode())
         return stdout.decode("utf-8")
 
     def __enter__(self):

@@ -8,22 +8,22 @@
       "version": "16.15",
       "sha256": "4f200ca23dfb120ff9838f13ce06014aad1d3c432d16ee9f93ab2000c0eeef7b",
       "distribution": "pgserver-pg16",
-      "package_version": "16.15.0",
-      "release_tag": "pg16.15-pgv0.8.6"
+      "package_version": "16.15.1",
+      "release_tag": "pg16.15-pgv0.8.6-r1"
     },
     "17": {
       "version": "17.11",
       "sha256": "5367f6fb2ec97efe1eb2e0c7926bb33438e51b0bd3a9733b88498056a7dc9a7e",
       "distribution": "pgserver-pg17",
-      "package_version": "17.11.0",
-      "release_tag": "pg17.11-pgv0.8.6"
+      "package_version": "17.11.1",
+      "release_tag": "pg17.11-pgv0.8.6-r1"
     },
     "18": {
       "version": "18.6",
       "sha256": "983ee554ec53dbeb9b70797bef9fcf4e67e117e7e48ca1463cc80b3ff8e8ff3f",
       "distribution": "pgserver-pg18",
-      "package_version": "18.6.0",
-      "release_tag": "pg18.6-pgv0.8.6-r1"
+      "package_version": "18.6.1",
+      "release_tag": "pg18.6-pgv0.8.6-r2"
     }
   }
 }

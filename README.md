@@ -12,9 +12,9 @@ The minor release pins below are maintained from the official
 
 | PostgreSQL | Python distribution | Distribution version | pgvector |
 | --- | --- | --- | --- |
-| 16.15 | `pgserver-pg16` | `16.15.0` | 0.8.6 |
-| 17.11 | `pgserver-pg17` | `17.11.0` | 0.8.6 |
-| 18.6 | `pgserver-pg18` | `18.6.0` | 0.8.6 |
+| 16.15 | `pgserver-pg16` | `16.15.1` | 0.8.6 |
+| 17.11 | `pgserver-pg17` | `17.11.1` | 0.8.6 |
+| 18.6 | `pgserver-pg18` | `18.6.1` | 0.8.6 |
 
 Each version builds on native **Linux x86_64**, **Linux aarch64**, and
 **macOS arm64** runners. Linux wheels target manylinux; macOS has a macOS 14
@@ -32,14 +32,14 @@ Select a wheel matching your PostgreSQL major, Python version, and platform
 from [Releases](https://github.com/DocumentDrivenDX/pgserver/releases):
 
 ```sh
-uv pip install /path/to/pgserver_pg17-17.11.0-<python-and-platform-tags>.whl
+uv pip install /path/to/pgserver_pg17-17.11.1-<python-and-platform-tags>.whl
 # A full GitHub Release asset URL works in place of the local path.
 ```
 
 No PyPI publication. Release tags are recorded in `build-versions.json`.
 They normally use `pg<version>-pgv<version>`; a revision suffix distinguishes
 changes to packaging for the same native versions. The expanded PG18 platform
-set uses `pg18.6-pgv0.8.6-r1` to preserve the initial tag's history.
+set uses `pg18.6-pgv0.8.6-r2` to preserve the initial tag's history.
 
 ```python
 from pathlib import Path

@@ -1,6 +1,6 @@
 [project]
 name = "pgserver-pg18" # Required
-version = "18.6.0"  # Required
+version = "18.6.1"  # Required
 description = "Self-contained postgres server for your python applications" # Required
 readme = "README.md" # Optional
 requires-python = ">=3.10"

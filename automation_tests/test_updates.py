@@ -158,5 +158,6 @@ class PublicationRetries(unittest.TestCase):
     def test_draft_without_a_tag_can_be_retried(self):
         commands = self.run_publisher([self.fixture(draft=True), self.fixture(draft=True)], ref_exists=False)
         self.assertIn('POST', commands[0])
-        self.assertIn('ref=refs/tags/pg18.6-pgv0.8.6-r1', commands[0])
+        tag = json.loads((ROOT / 'build-versions.json').read_text())['postgres']['18']['release_tag']
+        self.assertIn('ref=refs/tags/' + tag, commands[0])
         self.assertIn('--draft=false', commands[-1])
