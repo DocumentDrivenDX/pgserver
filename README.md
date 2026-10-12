@@ -7,7 +7,7 @@ full Lakebase feature parity.
 
 ## Versions and platforms
 
-The pinned latest minor releases, checked on 2026-10-11 against the official
+The minor release pins below are maintained from the official
 [PostgreSQL version table](https://www.postgresql.org/support/versioning/), are:
 
 | PostgreSQL | Python distribution | Distribution version | pgvector |
@@ -73,18 +73,36 @@ curl, bison, flex, zlib development headers, and patchelf on Linux. Source
 installs require `make` first. A selected major requires a clean native install
 to prevent reuse of binaries from a different PostgreSQL version.
 
-1. Update the corresponding version, checksum, distribution version and release
-   tag in `build-versions.json`. Keep the Makefile and pyproject default PG18
-   values aligned with that entry.
-2. Obtain PostgreSQL source checksums from its official release directory and
-   independently review pgvector source checksums when updating pgvector.
-3. Run the nine-job build matrix. Installed-wheel tests check binary versions,
-   bundled licenses, pgvector loading, Unix sockets, disabled TCP, and cleanup,
-   in addition to the upstream test suite.
-4. Dispatch the workflow from `main` with `publish=true`. Only after all nine
-   platform/version jobs pass will it create three separate GitHub Releases,
-   with wheels, checksums and GitHub build-provenance attestations. Each release
-   tag targets the exact workflow commit. Choose new tags for subsequent updates.
+### Automatic minor release updates
+
+The `Automatically update PostgreSQL minor releases` GitHub workflow runs every
+six hours (00:23, 06:23, 12:23, 18:23 UTC), and can be dispatched manually.
+GitHub may delay scheduled runs. It reads the official
+[stable-version feed](https://www.postgresql.org/versions.rss), tracks only
+PostgreSQL 16, 17, and 18, rejects downgrades and prereleases, and downloads each
+new source archive to verify the official SHA256 before committing new pins.
+The checksum, distribution version, release tag, README table, and PG18 default
+build metadata are updated together. pgvector remains separately pinned.
+
+A missing or draft release triggers the same nine-job build/test matrix used
+for manual publication. All nine must pass before a new release is published.
+Every release must contain all twelve Python/platform wheels and checksums;
+provenance attestations are generated before upload. Uploads use drafts and
+can be retried on the next scheduled check. Existing complete public releases
+are skipped and never overwritten. Network, validation and test failures fail
+the workflow and leave publication gated. GitHub Actions provides failure
+notifications according to repository/account subscription settings.
+
+Checks with no new version or incomplete release skip native builds. A monthly
+verification receipt commit keeps the public scheduled workflow active between
+quarterly PostgreSQL releases, avoiding GitHub's 60-day inactivity disablement.
+No personal access token, external scheduler, or Codex follow-up is required;
+the workflow uses the repository's scoped `GITHUB_TOKEN`.
+
+For an intentional manual packaging or pgvector update, change
+`build-versions.json`, keep default PG18 metadata aligned, choose new release
+tags, then dispatch `Build verified release wheels` from `main` with
+`publish=true`. Existing published assets remain immutable.
 
 PostgreSQL minor releases normally arrive roughly quarterly; consult its
 [release schedule](https://www.postgresql.org/developer/roadmap/).

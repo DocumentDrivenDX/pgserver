@@ -11,6 +11,9 @@ on:
         default: false
 permissions:
   contents: read
+concurrency:
+  group: pgserver-wheels-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   wheels:
     name: PostgreSQL ${{ matrix.postgres }} / ${{ matrix.platform.name }}
@@ -58,7 +61,7 @@ jobs:
           path: wheelhouse/*.whl
           if-no-files-found: error
   release:
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    if: inputs.publish && github.ref == 'refs/heads/main'
     needs: wheels
     strategy:
       fail-fast: false
@@ -71,29 +74,40 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v4
-      - name: Read release identity
+      - name: Check whether this release needs publication
+        id: pending
         env:
           PG_MAJOR: ${{ matrix.postgres }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python - <<'PY'
-          import json, os
+          git rev-parse HEAD | sed 's/^/SOURCE_SHA=/' >> "$GITHUB_ENV"
+          python - <<'PYTHON'
+          import json, os, sys
           from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from release_status import complete, get_release
           entry = json.loads(Path('build-versions.json').read_text())['postgres'][os.environ['PG_MAJOR']]
-          with open(os.environ['GITHUB_ENV'], 'a') as output:
-              output.write(f"RELEASE_TAG={entry['release_tag']}\n")
-          PY
+          release = get_release(os.environ['GITHUB_REPOSITORY'], entry['release_tag'])
+          if release is not None and not release['draft'] and not complete(release, entry):
+              raise SystemExit('Published release is incomplete; refusing to overwrite it')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"publish={str(not complete(release, entry)).lower()}\n")
+          PYTHON
       - uses: actions/download-artifact@v4
+        if: steps.pending.outputs.publish == 'true'
         with:
           pattern: wheels-pg${{ matrix.postgres }}-*
           merge-multiple: true
           path: dist
       - uses: actions/attest-build-provenance@v2
+        if: steps.pending.outputs.publish == 'true'
         with:
           subject-path: dist/*.whl
       - name: Publish release wheels and checksums
+        if: steps.pending.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          PG_MAJOR: ${{ matrix.postgres }}
         run: |
-          cd dist
-          sha256sum *.whl > SHA256SUMS
-          gh release create "$RELEASE_TAG" *.whl SHA256SUMS --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
+          (cd dist && sha256sum *.whl > SHA256SUMS)
+          python scripts/publish-release.py

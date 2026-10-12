@@ -1,0 +1,57 @@
+name: Automatically update PostgreSQL minor releases
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pgserver-auto-update
+  cancel-in-progress: false
+jobs:
+  discover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      source_sha: ${{ steps.pins.outputs.source_sha }}
+      pending: ${{ steps.pending.outputs.pending }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test release detection and validation
+        run: python -m unittest discover -s automation_tests -v
+      - name: Discover and verify stable minor releases
+        run: python scripts/update-postgres.py
+      - name: Commit verified pins
+        id: pins
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --quiet; then
+            git add build-versions.json pgbuild/Makefile pyproject.toml src/pgserver/_build_info.json README.md .github/postgres-update-state.json
+            git commit -m 'Refresh verified PostgreSQL minor release state'
+            git push origin HEAD:main
+          fi
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Find missing or draft releases
+        id: pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/release_status.py
+      - name: Summarize update check
+        env:
+          PENDING: ${{ steps.pending.outputs.pending }}
+        run: |
+          echo "PostgreSQL majors awaiting publication: $PENDING" >> "$GITHUB_STEP_SUMMARY"
+      - name: Dispatch gated wheel publication
+        if: steps.pending.outputs.pending != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-and-test.yml --repo "$GITHUB_REPOSITORY" --ref main -f publish=true
