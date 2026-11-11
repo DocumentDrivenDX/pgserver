@@ -1,0 +1,14 @@
+name: macos-probe
+on:
+  push:
+    branches: [release/pypi]
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-26, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - run: uname -m && sw_vers
