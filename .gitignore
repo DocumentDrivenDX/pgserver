@@ -133,7 +133,8 @@ dmypy.json
 .idea
 
 build/
-pgbuild/
+/pgbuild/*
+!/pgbuild/Makefile
 src/pgserver/pginstall
 
 # Generated from verified dependency source archives
