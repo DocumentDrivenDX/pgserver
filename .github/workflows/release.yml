@@ -9,6 +9,7 @@
 name: release
 on:
   push:
+    branches: [release/pypi]  # TEMPORARY dry-run trigger, removed before merge
     tags: ['pgserver-pg1[6-8]-v*']
   workflow_dispatch:
     inputs:
@@ -44,15 +45,15 @@ jobs:
       - id: r
         env:
           REF_NAME: ${{ github.ref_name }}
-          EVENT: ${{ github.event_name }}
-          INPUT_MAJOR: ${{ inputs.major }}
-          BACKFILL: ${{ inputs.backfill_tag }}
+          REF_TYPE: ${{ github.ref_type }}
+          INPUT_MAJOR: ${{ inputs.major || '18' }}
+          BACKFILL: ${{ inputs.backfill_tag || 'none' }}
         run: |
           python3 - <<'PYTHON'
           import json, os, re
           config = json.load(open('build-versions.json'))
           build = 'true'
-          if os.environ['EVENT'] == 'push':
+          if os.environ['REF_TYPE'] == 'tag':
               m = re.fullmatch(r'pgserver-pg(1[678])-v(\d+\.\d+\.\d+)', os.environ['REF_NAME'])
               if not m:
                   raise SystemExit('Tag must look like pgserver-pg18-v18.6.1')
@@ -140,7 +141,7 @@ jobs:
   publish:
     # Tag pushes only. dispatch never reaches this job.
     needs: [resolve, wheels, smoke]
-    if: github.event_name == 'push'
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     environment: pypi
     permissions:
