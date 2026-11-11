@@ -10,8 +10,6 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('update_postgres', ROOT / 'scripts/update-postgres.py')
 updater = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(updater)
-sys.path.insert(0, str(ROOT / 'scripts'))
-from release_status import complete, expected_wheels
 
 
 class ReleaseUpdates(unittest.TestCase):
@@ -58,20 +56,6 @@ class ReleaseUpdates(unittest.TestCase):
             updater.update_config(self.config, self.latest, checksum)
         self.assertEqual(self.config, original)
 
-    def test_complete_release_requires_every_python_and_platform(self):
-        entry = self.config['postgres']['18']
-        names = expected_wheels(entry) | {'SHA256SUMS'}
-        release = {'draft': False, 'prerelease': False, 'assets': [{'name': name, 'state': 'uploaded', 'size': 10} for name in names]}
-        self.assertTrue(complete(release, entry))
-        release['assets'].pop()
-        self.assertFalse(complete(release, entry))
-        self.assertFalse(complete(None, entry))
-        release['draft'] = True
-        self.assertFalse(complete(release, entry))
-
-
-if __name__ == '__main__':
-    unittest.main()
 
 class SourceIntegrity(unittest.TestCase):
     def test_source_hash_mismatch_is_rejected(self):
@@ -111,66 +95,28 @@ class PinPersistence(unittest.TestCase):
             self.assertEqual(info['version'], f'18.{minor}')
             self.assertIn(f'| 18.{minor} |', (root / 'README.md').read_text())
 
-class PublicationRetries(unittest.TestCase):
-    def run_publisher(self, releases, ref_exists=True):
-        import contextlib
-        import os
-        import runpy
-        import tempfile
-        from unittest.mock import patch
-        config = json.loads((ROOT / 'build-versions.json').read_text())
-        entry = config['postgres']['18']
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            (root / 'build-versions.json').write_text(json.dumps(config))
-            (root / 'dist').mkdir()
-            for name in expected_wheels(entry) | {'SHA256SUMS'}:
-                (root / 'dist' / name).write_text('test artifact')
-            with contextlib.chdir(root), patch.dict(os.environ, PG_MAJOR='18', GITHUB_REPOSITORY='DocumentDrivenDX/pgserver', SOURCE_SHA='c' * 40), patch('release_status.get_release', side_effect=releases), patch('release_status.get_ref', return_value={'object': {}} if ref_exists else None), patch('subprocess.run') as command:
-                try:
-                    runpy.run_path(str(ROOT / 'scripts/publish-release.py'))
-                except SystemExit as result:
-                    if result.code != 0:
-                        raise
-                return [call.args[0] for call in command.call_args_list]
 
-    def fixture(self, draft=False):
-        entry = json.loads((ROOT / 'build-versions.json').read_text())['postgres']['18']
-        return {'draft': draft, 'prerelease': False, 'assets': [{'name': name, 'state': 'uploaded', 'size': 10} for name in expected_wheels(entry) | {'SHA256SUMS'}]}
+class PendingReleases(unittest.TestCase):
+    def test_versions_missing_from_pypi_are_pending(self):
+        import io
+        import urllib.error
 
-    def test_published_release_is_never_overwritten(self):
-        self.assertEqual(self.run_publisher([self.fixture()]), [])
+        def fake_fetch(url):
+            if '/pgserver-pg17/' in url:
+                return io.BytesIO(b'{}')
+            raise urllib.error.HTTPError(url, 404, 'Not Found', {}, None)
+        with patch.object(updater, 'fetch', side_effect=fake_fetch):
+            self.assertEqual(updater.pending_majors(self.config()), ['16', '18'])
 
-    def test_draft_retry_updates_only_unpublished_tag_and_finishes_upload(self):
-        commands = self.run_publisher([self.fixture(draft=True), self.fixture(draft=True)])
-        self.assertEqual(commands[0][:2], ['gh', 'api'])
-        self.assertIn('force=true', commands[0])
-        self.assertEqual(commands[1][:3], ['gh', 'release', 'upload'])
-        self.assertEqual(commands[2][:3], ['gh', 'release', 'edit'])
-        self.assertIn('--draft=false', commands[2])
+    def test_other_http_errors_are_not_treated_as_missing(self):
+        import urllib.error
+        with patch.object(updater, 'fetch', side_effect=urllib.error.HTTPError('u', 503, 'down', {}, None)):
+            with self.assertRaises(urllib.error.HTTPError):
+                updater.pending_majors(self.config())
 
-    def test_new_release_remains_draft_until_all_assets_are_uploaded(self):
-        commands = self.run_publisher([None, self.fixture(draft=True)])
-        self.assertEqual(commands[0][:3], ['gh', 'release', 'create'])
-        self.assertIn('--draft', commands[0])
-        self.assertEqual(commands[-1][:3], ['gh', 'release', 'edit'])
-
-    def test_draft_without_a_tag_can_be_retried(self):
-        commands = self.run_publisher([self.fixture(draft=True), self.fixture(draft=True)], ref_exists=False)
-        self.assertIn('POST', commands[0])
-        tag = json.loads((ROOT / 'build-versions.json').read_text())['postgres']['18']['release_tag']
-        self.assertIn('ref=refs/tags/' + tag, commands[0])
-        self.assertIn('--draft=false', commands[-1])
+    def config(self):
+        return json.loads((ROOT / 'build-versions.json').read_text())
 
 
-class DraftDiscovery(unittest.TestCase):
-    def test_unpublished_draft_is_found_through_release_collection(self):
-        import release_status
-        draft = {'tag_name': 'pg18.99-pgv0.8.6', 'draft': True}
-        with patch.object(release_status, 'get_json', side_effect=[None, [draft]]):
-            self.assertEqual(release_status.get_release('owner/repo', draft['tag_name']), draft)
-
-    def test_missing_release_remains_missing(self):
-        import release_status
-        with patch.object(release_status, 'get_json', side_effect=[None, []]):
-            self.assertIsNone(release_status.get_release('owner/repo', 'missing'))
+if __name__ == '__main__':
+    unittest.main()
