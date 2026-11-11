@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
@@ -47,6 +48,20 @@ def source_checksum(version):
     if digest.hexdigest() != expected:
         raise ValueError(f'Official source checksum mismatch for {version}')
     return expected
+
+
+def pending_majors(config):
+    """Majors whose pinned distribution version is not on PyPI yet (HTTP 404 only)."""
+    pending = []
+    for major, entry in config['postgres'].items():
+        url = f"https://pypi.org/pypi/{entry['distribution']}/{entry['package_version']}/json"
+        try:
+            fetch(url).close()
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+            pending.append(major)
+    return pending
 
 
 def update_config(config, latest, checksum):
@@ -98,8 +113,13 @@ def save_config(root, config):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--pending', action='store_true',
+                        help='print the JSON list of majors not yet published on PyPI and exit')
     args = parser.parse_args()
     config = json.loads((args.root / 'build-versions.json').read_text())
+    if args.pending:
+        print(json.dumps(pending_majors(config)))
+        return
     with fetch(FEED) as response:
         latest = stable_versions(response.read(), config['postgres'])
     result, changed = update_config(config, latest, source_checksum)

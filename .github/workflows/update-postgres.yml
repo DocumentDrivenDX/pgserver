@@ -14,9 +14,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
-      actions: write
     outputs:
-      source_sha: ${{ steps.pins.outputs.source_sha }}
       pending: ${{ steps.pending.outputs.pending }}
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +28,6 @@ jobs:
       - name: Discover and verify stable minor releases
         run: python scripts/update-postgres.py
       - name: Commit verified pins
-        id: pins
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -39,19 +36,9 @@ jobs:
             git commit -m 'Refresh verified PostgreSQL minor release state'
             git push origin HEAD:main
           fi
-          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Find missing or draft releases
+      - name: List versions not yet published to PyPI
         id: pending
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/release_status.py
-      - name: Summarize update check
-        env:
-          PENDING: ${{ steps.pending.outputs.pending }}
         run: |
-          echo "PostgreSQL majors awaiting publication: $PENDING" >> "$GITHUB_STEP_SUMMARY"
-      - name: Dispatch gated wheel publication
-        if: steps.pending.outputs.pending != '[]'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run build-and-test.yml --repo "$GITHUB_REPOSITORY" --ref main -f publish=true
+          pending=$(python scripts/update-postgres.py --pending)
+          echo "pending=$pending" >> "$GITHUB_OUTPUT"
+          echo "PostgreSQL majors not yet on PyPI (tag pgserver-pgNN-vX.Y.Z to release): $pending" >> "$GITHUB_STEP_SUMMARY"

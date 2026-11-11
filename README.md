@@ -16,44 +16,56 @@ The minor release pins below are maintained from the official
 | 17.11 | `pgserver-pg17` | `17.11.1` | 0.8.6 |
 | 18.6 | `pgserver-pg18` | `18.6.1` | 0.8.6 |
 
-Each version builds on native **Linux x86_64**, **Linux aarch64**, and
-**macOS arm64** runners. Linux wheels target manylinux; macOS has a macOS 14
-minimum. The matrix builds and tests CPython 3.10–3.13 wheels. Successful
-workflow artifacts and release assets establish availability for each target.
-Intel macOS and Windows are outside the current build matrix.
+Wheels are built for **Linux x86_64**, **Linux aarch64** (manylinux_2_17) and
+**macOS arm64** (macOS 14+), CPython 3.11-3.14. Intel macOS and Windows are not
+built. The product tests run in CI on Linux for each major; macOS wheels are
+built and tested by the release workflow only.
 
-All three distributions retain the Python import `pgserver`. Install only
-one in an environment: they own the same imports, as does upstream `pgserver`.
-Ordinary wheel installation does not compile PostgreSQL.
+All three distributions provide the Python import `pgserver`, as does upstream
+[`pgserver`](https://pypi.org/project/pgserver/) from orm011. **Install only
+one of them in an environment**: they own the same import and will overwrite
+each other's files. Ordinary wheel installation does not compile PostgreSQL.
 
 ## Install
 
-Select a wheel matching your PostgreSQL major, Python version, and platform
-from [Releases](https://github.com/DocumentDrivenDX/pgserver/releases):
+From the next release, from PyPI (pick one major):
 
 ```sh
-uv pip install /path/to/pgserver_pg17-17.11.1-<python-and-platform-tags>.whl
-# A full GitHub Release asset URL works in place of the local path.
+pip install pgserver-pg18   # or pgserver-pg17 / pgserver-pg16
 ```
 
-No PyPI publication. Release tags are recorded in `build-versions.json`.
-They normally use `pg<version>-pgv<version>`; a revision suffix distinguishes
-changes to packaging for the same native versions. The expanded PG18 platform
-set uses `pg18.6-pgv0.8.6-r2` to preserve the initial tag's history.
+Until then, install the current wheels from the GitHub Releases:
 
+```sh
+pip install pgserver-pg18 \
+  --find-links https://github.com/DocumentDrivenDX/pgserver/releases/expanded_assets/pg18.6-pgv0.8.6-r2
+# pg17: .../expanded_assets/pg17.11-pgv0.8.6-r1   pg16: .../expanded_assets/pg16.15-pgv0.8.6-r1
+```
+
+Each release also lists `SHA256SUMS`. A wheel can be installed directly from its
+asset URL too. Release tags for the existing wheels are recorded in
+`build-versions.json`.
+
+## Quickstart
+
+<!-- quickstart -->
 ```python
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import pgserver
 
-with TemporaryDirectory(prefix="pg-test-") as root:
+with TemporaryDirectory(prefix="pg-") as root:
     with pgserver.get_server(Path(root) / "data") as server:
-        print(server.get_uri())
+        print(server.psql("select version();"))
+        print(server.psql("create extension if not exists vector; "
+                          "select extversion from pg_extension where extname='vector';"))
 ```
+<!-- /quickstart -->
 
 On Unix the upstream API disables TCP and selects a Unix socket directory.
 Use a separate data directory per test worker and keep one server alive per
-worker. See [upstream usage](UPSTREAM-README.md).
+worker. See [upstream usage](UPSTREAM-README.md). CI executes this quickstart
+against every built wheel.
 
 ## Build and update
 
@@ -73,36 +85,28 @@ curl, bison, flex, zlib development headers, and patchelf on Linux. Source
 installs require `make` first. A selected major requires a clean native install
 to prevent reuse of binaries from a different PostgreSQL version.
 
+### Releasing
+
+The `release` workflow runs only on a tag named `pgserver-pgNN-vX.Y.Z` (the
+version must equal `package_version` in `build-versions.json`). It builds the
+twelve wheels for that major, runs the product tests and the README quickstart,
+smoke-tests the built wheel in a fresh venv, publishes to PyPI with trusted
+publishing and creates a GitHub Release with the wheels and `SHA256SUMS`. A manual
+dispatch runs the build and smoke tests only (`dry_run` defaults to true).
+
 ### Automatic minor release updates
 
-The `Automatically update PostgreSQL minor releases` GitHub workflow runs every
-six hours (00:23, 06:23, 12:23, 18:23 UTC), and can be dispatched manually.
-GitHub may delay scheduled runs. It reads the official
+The `Automatically update PostgreSQL minor releases` workflow runs every six
+hours and can be dispatched manually. It reads the official
 [stable-version feed](https://www.postgresql.org/versions.rss), tracks only
-PostgreSQL 16, 17, and 18, rejects downgrades and prereleases, and downloads each
-new source archive to verify the official SHA256 before committing new pins.
-The checksum, distribution version, release tag, README table, and PG18 default
-build metadata are updated together. pgvector remains separately pinned.
-
-A missing or draft release triggers the same nine-job build/test matrix used
-for manual publication. All nine must pass before a new release is published.
-Every release must contain all twelve Python/platform wheels and checksums;
-provenance attestations are generated before upload. Uploads use drafts and
-can be retried on the next scheduled check. Existing complete public releases
-are skipped and never overwritten. Network, validation and test failures fail
-the workflow and leave publication gated. GitHub Actions provides failure
-notifications according to repository/account subscription settings.
-
-Checks with no new version or incomplete release skip native builds. A monthly
-verification receipt commit keeps the public scheduled workflow active between
-quarterly PostgreSQL releases, avoiding GitHub's 60-day inactivity disablement.
-No personal access token, external scheduler, or Codex follow-up is required;
-the workflow uses the repository's scoped `GITHUB_TOKEN`.
-
-For an intentional manual packaging or pgvector update, change
-`build-versions.json`, keep default PG18 metadata aligned, choose new release
-tags, then dispatch `Build verified release wheels` from `main` with
-`publish=true`. Existing published assets remain immutable.
+PostgreSQL 16, 17 and 18, rejects downgrades and prereleases, and verifies each
+new source archive against the official SHA256 before committing new pins.
+The checksum, distribution version, README table and PG18 default build
+metadata are updated together; pgvector remains separately pinned. The run
+summary lists majors whose pinned version is not on PyPI yet
+(`python scripts/update-postgres.py --pending`); tag a release to publish them.
+A monthly state commit keeps the scheduled workflow from being disabled after
+60 days of inactivity.
 
 PostgreSQL minor releases normally arrive roughly quarterly; consult its
 [release schedule](https://www.postgresql.org/developer/roadmap/).
@@ -115,3 +119,5 @@ use the PostgreSQL license; their source license texts are included in wheels.
 The fork keeps the caller API and changes build versions, checksum validation,
 portable pgvector flags, relocatable native libraries, license packaging,
 and release automation.
+
+See [CHANGELOG.md](CHANGELOG.md).
