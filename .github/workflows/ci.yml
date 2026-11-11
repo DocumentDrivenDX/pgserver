@@ -1,0 +1,45 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  updater-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s automation_tests -v
+  product-tests:
+    name: product tests (PostgreSQL ${{ matrix.postgres }})
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '17', '18']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select pinned PostgreSQL and package identity
+        run: python scripts/select-postgres.py '${{ matrix.postgres }}'
+      # cibuildwheel builds PostgreSQL + pgvector, builds the wheel, installs it and runs
+      # the pytest suite in tests/ (see cibuildwheel_test.bash) against the installed wheel.
+      - name: Build wheel and run product tests
+        uses: pypa/cibuildwheel@v3.3.1
+        env:
+          CIBW_ARCHS: x86_64
+          CIBW_BUILD: 'cp312-*'
+          CIBW_SKIP: '*-musllinux*'
+          CIBW_BEFORE_ALL_LINUX: 'yum install -y bison flex zlib-devel && command -v patchelf && make'
