@@ -12,9 +12,9 @@ The minor release pins below are maintained from the official
 
 | PostgreSQL | Python distribution | Distribution version | pgvector |
 | --- | --- | --- | --- |
-| 16.15 | `pgserver-pg16` | `16.15.1` | 0.8.6 |
-| 17.11 | `pgserver-pg17` | `17.11.1` | 0.8.6 |
-| 18.6 | `pgserver-pg18` | `18.6.1` | 0.8.6 |
+| 16.16 | `pgserver-pg16` | `16.16.0` | 0.8.6 |
+| 17.12 | `pgserver-pg17` | `17.12.0` | 0.8.6 |
+| 18.7 | `pgserver-pg18` | `18.7.0` | 0.8.6 |
 
 Wheels are built for **Linux x86_64**, **Linux aarch64** (manylinux_2_17) and
 **macOS arm64** (macOS 14+), CPython 3.11-3.14. Intel macOS and Windows are not

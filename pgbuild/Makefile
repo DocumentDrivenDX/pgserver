@@ -7,8 +7,8 @@ JOBS ?= 4
 all: pgvector postgres
 
 ### postgres
-POSTGRES_VERSION ?= 18.6
-POSTGRES_SHA256 ?= 983ee554ec53dbeb9b70797bef9fcf4e67e117e7e48ca1463cc80b3ff8e8ff3f
+POSTGRES_VERSION ?= 18.7
+POSTGRES_SHA256 ?= 19c2dc7d8520e10532d082b43c36c4d2dcc6cd9e40506c6f598e7338f84bbde7
 POSTGRES_URL := https://ftp.postgresql.org/pub/source/v$(POSTGRES_VERSION)/postgresql-$(POSTGRES_VERSION).tar.gz
 POSTGRES_SRC := postgresql-$(POSTGRES_VERSION)
 POSTGRES_BLD := $(POSTGRES_SRC)
